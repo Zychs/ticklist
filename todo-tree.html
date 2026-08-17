@@ -1,0 +1,706 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Todo tree — trunk composite</title>
+<style>
+  @font-face { font-family: "OpenDyslexic3"; src: url("../../fonts/OpenDyslexic3-Regular.ttf") format("truetype"); font-weight: 400; }
+  @font-face { font-family: "OpenDyslexic3"; src: url("../../fonts/OpenDyslexic3-Bold.ttf") format("truetype"); font-weight: 700; }
+
+  :root {
+    --bg: #0b0f14; --panel: #121820; --line: #1e2833;
+    --ink: #dfe7ef; --dim: #8b9aab;
+    --p5: #ff6b6b; --p4: #ffa94d; --p3: #ffd43b; --p2: #74c0fc; --p1: #6f7f90;
+    --accent: #4dd0e1;
+    --ok: #69db7c; --warn: #ffa94d; --bad: #ff6b6b;
+    --lat: #b197fc; --exp: #74c0fc;
+  }
+  * { box-sizing: border-box; }
+  html[data-type="compact"] body { zoom: 0.82; }
+  html[data-type="dense"] body { zoom: 0.9; }
+  html[data-type="large"] body { zoom: 1.14; }
+  html[data-type="huge"] body { zoom: 1.28; }
+  body {
+    margin: 0; padding: 28px 22px 80px; background: var(--bg); color: var(--ink);
+    font-family: "OpenDyslexic3", system-ui, sans-serif; line-height: 1.55;
+  }
+  body.sans { font-family: "Atkinson Hyperlegible", "Lexend", system-ui, sans-serif; }
+  .wrap { max-width: 920px; margin: 0 auto; }
+
+  h1 { font-size: 26px; margin: 0 0 4px; letter-spacing: .2px; }
+  .sub { color: var(--dim); font-size: 13px; margin-bottom: 14px; }
+
+  /* ── Trunk composite card ── */
+  .trunk {
+    background: var(--panel); border: 1px solid var(--line); border-left: 4px solid var(--accent);
+    border-radius: 8px; padding: 16px 16px 14px; margin-bottom: 20px;
+  }
+  .trunk > h2 {
+    font-size: 13px; margin: 0 0 10px; color: var(--accent);
+    letter-spacing: .45px; text-transform: uppercase;
+  }
+  .trunk .complete {
+    display: inline-block; font-size: 12px; font-weight: 700;
+    padding: 2px 8px; border-radius: 4px; margin-left: 8px;
+    vertical-align: middle; letter-spacing: .3px;
+  }
+  .trunk .complete.ok { background: rgba(105,219,124,.15); color: var(--ok); }
+  .trunk .complete.bad { background: rgba(255,107,107,.15); color: var(--bad); }
+
+  .layman {
+    font-size: 18px; font-weight: 700; line-height: 1.45;
+    margin: 0 0 12px; color: var(--ink);
+  }
+  .jargon {
+    font-size: 13px; color: var(--dim); margin: 0 0 14px;
+    padding: 8px 10px; background: #0e151c; border-radius: 6px;
+    border: 1px dashed var(--line);
+  }
+  .jargon b { color: var(--dim); font-weight: 700; text-transform: uppercase; font-size: 11px; letter-spacing: .4px; }
+
+  /* ── The four gates — the biggest thing on the card ── */
+  .gates-h {
+    display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap;
+    margin: 0 0 8px;
+  }
+  .gates-h h3 {
+    margin: 0; font-size: 13px; letter-spacing: .5px; text-transform: uppercase; color: var(--accent);
+  }
+  .gates-h .tally { font-size: 12px; color: var(--dim); }
+  .gates-h .tally b { color: var(--bad); font-weight: 700; }
+  .gates {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 0 0 14px;
+  }
+  @media (max-width: 720px) { .gates { grid-template-columns: 1fr; } }
+
+  .gate {
+    background: #0e151c; border: 1px solid var(--line); border-left: 4px solid var(--line);
+    border-radius: 6px; padding: 9px 11px 10px;
+  }
+  /* NO RECEIPT — nothing backs this, so it under-claims: dim, quiet, counts open.
+     Hover brings it back to full ink so it stays readable, never trusted. */
+  .gate.open { opacity: .45; border-left-color: var(--dim); }
+  .gate.open:hover { opacity: 1; }
+  /* LAW (Phase 1) — a receipt resolved, so it earns full ink and green. */
+  .gate.law { opacity: 1; border-left-color: var(--ok); }
+  /* DRIFTED (Phase 3) — the quote no longer matches its source. Loudest thing
+     on the card, hoisted, and it names whoever wrote the row. */
+  .gate.drifted {
+    grid-column: 1 / -1; opacity: 1;
+    background: #131a22; border-color: rgba(255,107,107,.30);
+    border-left-color: var(--bad);
+    box-shadow: inset 0 0 0 1px rgba(255,107,107,.06);
+  }
+
+  .gate .gh { display: flex; align-items: baseline; gap: 8px; margin: 0 0 3px; }
+  .gate .gid {
+    flex: none; font-weight: 700; font-size: 13px; letter-spacing: .3px;
+    padding: 1px 7px; border-radius: 4px; color: #0b0f14; background: var(--dim);
+  }
+  .gate.law .gid { background: var(--ok); }
+  .gate.drifted .gid { background: var(--bad); }
+  .gate .gname { font-size: 16px; font-weight: 700; }
+  .gate .gstat {
+    margin-left: auto; flex: none; font-size: 11px; font-weight: 700;
+    letter-spacing: .5px; text-transform: uppercase; color: var(--dim);
+  }
+  .gate.law .gstat { color: var(--ok); }
+  .gate.drifted .gstat { color: var(--bad); }
+
+  .gate .gq { margin: 0 0 6px; font-size: 14px; color: var(--ink); }
+
+  .gate .opts { display: flex; flex-wrap: wrap; gap: 5px; margin: 0 0 6px; }
+  .gate .opt {
+    font-size: 13px; padding: 3px 9px; border-radius: 999px;
+    border: 1px solid var(--line); color: var(--dim); background: #0b0f14;
+  }
+  /* No `.opt.pick`. A chosen option is a state claim; it can only come from a
+     resolved receipt, never from a key in todos.js. */
+  .gate .gnote { margin: 0; font-size: 12px; color: var(--dim); line-height: 1.4; }
+  .gate .gnote b {
+    color: var(--lat); font-size: 10px; letter-spacing: .5px; text-transform: uppercase;
+  }
+  /* The answered gate's own words, at the address the card re-opened. */
+  .gate .rq { margin: 0 0 4px; font-size: 13px; color: var(--ink); }
+  .gate .rsrc { margin: 0; font-size: 11px; color: var(--dim); word-break: break-all; }
+
+  /* ── Next line to answer — recomputed every paint from the live strip ── */
+  .nextline {
+    margin: 0 0 12px; padding: 10px 12px; border-radius: 6px;
+    background: rgba(77,208,225,.07); border: 1px solid rgba(77,208,225,.30);
+    font-size: 15px;
+  }
+  .nextline b {
+    display: block; font-size: 11px; letter-spacing: .5px; text-transform: uppercase;
+    color: var(--accent); margin-bottom: 3px;
+  }
+  .nextline .gid {
+    font-weight: 700; font-size: 12px; padding: 1px 6px; border-radius: 4px;
+    color: #0b0f14; background: var(--accent); margin-right: 6px;
+  }
+  .waiting {
+    margin: -6px 0 14px; font-size: 12px; color: var(--dim);
+  }
+  .waiting b {
+    color: var(--dim); font-size: 10px; letter-spacing: .5px; text-transform: uppercase;
+  }
+
+  .grid2 {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px;
+  }
+  @media (max-width: 640px) { .grid2 { grid-template-columns: 1fr; } }
+
+  .blk {
+    background: #0e151c; border: 1px solid var(--line); border-radius: 6px; padding: 10px 12px;
+  }
+  .blk h3 {
+    margin: 0 0 6px; font-size: 12px; letter-spacing: .4px;
+    text-transform: uppercase; color: var(--dim);
+  }
+  .blk.reply { border-color: rgba(77,208,225,.35); grid-column: 1 / -1; }
+  .blk.reply h3 { color: var(--accent); }
+  .blk.reply .txt { font-size: 15px; margin: 0; }
+  .blk ul { list-style: none; margin: 0; padding: 0; }
+  .blk li {
+    font-size: 14px; margin: 0 0 5px; padding-left: 1.1em; text-indent: -1.1em;
+  }
+  .blk li::before { content: "— "; color: var(--dim); }
+
+  .landmarks { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; }
+  @media (max-width: 640px) { .landmarks { grid-template-columns: 1fr; } }
+  .lm h3 {
+    margin: 0 0 8px; font-size: 12px; letter-spacing: .4px; text-transform: uppercase;
+  }
+  .lm.exp h3 { color: var(--exp); }
+  .lm.lat h3 { color: var(--lat); }
+  .lm article {
+    margin: 0 0 8px; padding: 8px 10px; border-radius: 6px;
+    background: #0e151c; border: 1px solid var(--line);
+  }
+  .lm.exp article { border-left: 3px solid var(--exp); }
+  .lm.lat article { border-left: 3px solid var(--lat); }
+  .lm .nm { font-weight: 700; font-size: 14px; margin: 0 0 2px; }
+  .lm .pl { font-size: 13px; color: var(--dim); margin: 0; }
+
+  .after { font-size: 14px; color: var(--dim); margin: 0; }
+  .after b { color: var(--ink); }
+  .miss {
+    color: var(--bad); font-size: 13px; font-weight: 700;
+    padding: 6px 8px; background: rgba(255,107,107,.08); border-radius: 4px;
+    margin: 0 0 8px;
+  }
+
+  .bar { display: flex; gap: 8px; align-items: center; margin-bottom: 14px; flex-wrap: wrap; }
+  button {
+    background: var(--panel); color: var(--ink); border: 1px solid var(--line);
+    border-radius: 6px; padding: 6px 11px; font: inherit; font-size: 13px; cursor: pointer;
+  }
+  button:hover { border-color: var(--accent); color: var(--accent); }
+  .count { color: var(--dim); font-size: 13px; margin-left: auto; }
+  .daylab { font-size: 11px; letter-spacing: .5px; text-transform: uppercase; color: var(--dim); }
+  select {
+    background: var(--panel); color: var(--ink); border: 1px solid var(--line);
+    border-radius: 6px; padding: 5px 8px; font: inherit; font-size: 13px;
+  }
+  /* Where these rows came from. Never a silent swap between the live day board
+     and the fallback file — the card says which one it is painting. */
+  .daynote {
+    margin: -6px 0 12px; font-size: 12px; color: var(--dim);
+    padding: 7px 10px; background: #0e151c; border: 1px solid var(--line);
+    border-radius: 6px; word-break: break-all;
+  }
+  .daynote.warn { color: var(--warn); border-color: rgba(255,169,77,.35); }
+  .daynote b { color: var(--ink); font-weight: 700; }
+
+  .row { border: 1px solid var(--line); border-radius: 8px; margin-bottom: 8px; background: var(--panel); overflow: hidden; }
+  .head {
+    display: flex; gap: 12px; align-items: baseline; width: 100%; text-align: left;
+    background: none; border: 0; border-radius: 0; padding: 12px 14px; cursor: pointer;
+  }
+  .head:hover { background: #16202b; color: inherit; }
+  .chip {
+    flex: none; width: 30px; height: 22px; line-height: 22px; text-align: center;
+    border-radius: 5px; font-size: 12px; font-weight: 700; color: #0b0f14;
+  }
+  .p5 { background: var(--p5); } .p4 { background: var(--p4); }
+  .p3 { background: var(--p3); } .p2 { background: var(--p2); } .p1 { background: var(--p1); }
+  .dir { font-size: 19px; font-weight: 700; }
+  .ttl { font-size: 15px; color: var(--dim); }
+  .meta { margin-left: auto; flex: none; font-size: 12px; color: var(--dim); }
+
+  .body { border-top: 1px solid var(--line); padding: 12px 14px 14px; display: none; }
+  .row.open .body { display: block; }
+  .row.open .head { background: #16202b; }
+  ul.items { list-style: none; margin: 0 0 10px; padding: 0; }
+  li.item { font-size: 16px; margin: 0 0 6px; white-space: pre-wrap; tab-size: 2; padding-left: 3.2em; text-indent: -3.2em; }
+  .move { font-size: 14px; color: var(--dim); border-top: 1px dashed var(--line); padding-top: 8px; }
+  .move b { color: var(--accent); font-weight: 700; }
+
+  .cth-titlebar {
+    display: none; padding: 12px 16px; font-weight: 700; font-size: 18px;
+    color: var(--accent); letter-spacing: .3px; background: var(--panel);
+  }
+  .cth-titlebar .hint { color: var(--dim); font-weight: 400; font-size: 12px; margin-left: 10px; }
+  html.cth-on:not(.cth-open),
+  html.cth-on:not(.cth-open) body {
+    height: 100%; margin: 0; padding: 0; overflow: hidden;
+  }
+  html.cth-on:not(.cth-open) body { display: flex; min-height: 100vh; }
+  html.cth-on:not(.cth-open) body > *:not(.cth-titlebar) { display: none !important; }
+  html.cth-on:not(.cth-open) .cth-titlebar {
+    display: flex; align-items: center; flex: 1 1 auto; min-height: 100%; width: 100%;
+    border: 0; cursor: default; transition: opacity 120ms ease; opacity: 1;
+  }
+  html.cth-on.cth-open .cth-titlebar { display: none; }
+</style>
+
+<div class="cth-titlebar" aria-hidden="true">Todo tree<span class="hint">hover to expand</span></div>
+<div class="wrap">
+  <h1>Todo tree</h1>
+  <div class="sub" id="sub"></div>
+
+  <div class="trunk">
+    <h2>Trunk — the lines that want an answer <span class="complete" id="trunkBadge"></span></h2>
+    <div id="trunk"></div>
+  </div>
+
+  <div class="bar">
+    <label class="daylab" for="daySel">day</label>
+    <select id="daySel"><option value="today">today</option></select>
+    <button id="expand">expand all</button>
+    <button id="collapse">collapse all</button>
+    <button id="top3">top priority only</button>
+    <button id="face">OD / Sans</button>
+    <span class="count" id="count"></span>
+  </div>
+
+  <p class="daynote" id="daynote" hidden></p>
+
+  <div id="list"></div>
+</div>
+
+<script src="/type-scale.js"></script>
+<script src="todos.js"></script>
+<script>
+  if (window.TypeScale) {
+    TypeScale.installDocument({
+      storageKey: "artifact-scanner-type-scale-tree",
+      label: "Todo tree",
+    });
+  }
+  const KEY = "todo-tree-open";
+  const openSet = new Set(JSON.parse(localStorage.getItem(KEY) || "[]"));
+  const save = () => localStorage.setItem(KEY, JSON.stringify([...openSet]));
+
+  const META = window.TODO_TREE_META || {};
+  document.getElementById("sub").textContent =
+    (META.stamp || "") + " — " + (META.source || "");
+
+  renderTrunk(META);
+
+  const list = document.getElementById("list");
+  const note = document.getElementById("daynote");
+  const daySel = document.getElementById("daySel");
+
+  /**
+   * The rows are a VIEW ON THE JWRANGLE DAY BOARD, not a second list.
+   * /api/tree/day parses whatever day.md that day happens to hold — no queue
+   * name, count or shape is known here. todos.js is the fallback only, and when
+   * it paints the card says so out loud rather than passing a stale paste off
+   * as today's work.
+   */
+  let rows = [];
+
+  function paint(items, meta) {
+    list.innerHTML = "";
+    rows = items.slice().sort((a, b) => b.priority - a.priority).map(build);
+    rows.forEach(r => list.appendChild(r.el));
+    document.getElementById("count").textContent =
+      items.length + (meta.live ? " queues · " : " directories · ") +
+      items.reduce((n, t) => n + (t.items || []).length, 0) +
+      (meta.live ? " slots" : " items");
+    note.hidden = false;
+    note.className = "daynote" + (meta.live ? "" : " warn");
+    note.innerHTML = meta.html;
+  }
+
+  // status word → the priority chip the row grammar already uses
+  function prio(status) {
+    const s = String(status || "").toLowerCase();
+    if (/active|now|engaged|hot/.test(s)) return 5;
+    if (/next|ready|open/.test(s)) return 4;
+    if (/pending|wait/.test(s)) return 3;
+    if (/park|hold|later/.test(s)) return 2;
+    return 1;
+  }
+
+  function queueToRow(q, day) {
+    const slots = (q.slots || []).map(s => (s.slot ? s.slot + "  " : "") + (s.text || ""));
+    const pay = (day.payloads || []).find(p => {
+      const stem = p.name.replace(/^q-?/, "").replace(/\.md$/, "").toLowerCase();
+      return stem && String(q.name || "").toLowerCase().indexOf(stem) >= 0;
+    });
+    return {
+      dir: q.name || ("Q" + q.q),
+      title: q.head || "",
+      priority: prio(q.status),
+      origin: "Q" + q.q + " · " + (q.status || ""),
+      move: pay ? pay.name + " — " + pay.path : "no q-file on this day for this queue",
+      items: slots.length ? slots : ["(no slots written under this queue yet)"],
+      hidden: true,
+    };
+  }
+
+  function fallback(why) {
+    paint((window.TODOS || []).slice(), {
+      live: false,
+      html: "<b>Not the live day board.</b> " + esc(why) +
+        " — showing the fallback list in todos.js, which is a paste from " +
+        "2026-08-04 and is not today's work.",
+    });
+  }
+
+  function loadDay(which) {
+    const q = which && which !== "today" ? "?day=" + encodeURIComponent(which) : "";
+    fetch("/api/tree/day" + q, { cache: "no-store" })
+      .then(r => r.json())
+      .then(d => {
+        if (!d || !d.ok) { fallback((d && d.error) || "day endpoint said no"); return; }
+        const items = (d.queues || []).map(q => queueToRow(q, d));
+        if (!items.length) { fallback("that day's board has no queues"); return; }
+        const c = d.counts || {};
+        paint(items, {
+          live: true,
+          html: (d.fallback_note ? "<b>" + esc(d.fallback_note) + "</b> · " : "") +
+            "<b>" + esc(d.day_id) + "</b> (" + esc(d.iso) + ")" +
+            (d.is_today ? " · today" : "") + " — " +
+            (c.queues || 0) + " queues · " + (c.slots || 0) + " slots · " +
+            (c.payloads || 0) + " q-files · " + esc(d.day_dir),
+        });
+      })
+      .catch(e => fallback("serve not reachable (" + e.message + ")"));
+  }
+
+  // Any day, not just today: ?day=YYYY-MM-DD in the URL, or the picker.
+  // Guarded so check-contract.js — which evals this script under DOM stubs with
+  // no fetch and no location — still exercises the render path.
+  const online = typeof fetch === "function" && typeof location !== "undefined";
+  if (online) {
+    const urlDay = new URLSearchParams(location.search).get("day") || "today";
+    fetch("/api/reconstruct/days?limit=30", { cache: "no-store" })
+      .then(r => r.json())
+      .then(d => {
+        (d.days || []).slice().reverse().forEach(x => {
+          if (!x.has_day_md) return;
+          const o = document.createElement("option");
+          o.value = x.iso;
+          o.textContent = x.day_id + (x.is_today ? " · today" : "");
+          daySel.appendChild(o);
+        });
+        daySel.value = urlDay;
+      })
+      .catch(() => {});
+    daySel.addEventListener("change", () => loadDay(daySel.value));
+    loadDay(urlDay);
+  } else {
+    fallback("no browser environment");
+  }
+
+  /**
+   * Shape check ONLY — counts filled reading fields. It has never been able to
+   * tell whether any of them are TRUE, which is exactly how a green chip sat on
+   * a plate that was wrong for five days. No legacy trunkCheck fallback: a
+   * fallback to authored state is a fabrication vector with a nice name.
+   */
+  function normalizeTrunk(meta) {
+    const t = meta.trunk || {};
+    t.landmarks = t.landmarks || { explicit: [], latent: [] };
+    t.afterTrunk = t.afterTrunk || [];
+    t.gates = t.gates || [];
+    // The bench: further questions, same whitelist, same "no answers here" rule.
+    // They are not shown as live lines until a receipt retires one above them.
+    t.bench = t.bench || [];
+
+    const missing = [];
+    if (!t.gates.length) missing.push("gates (the roster of questions)");
+    if (!str(t.layman)) missing.push("layman (plain English — required)");
+    if (!str(t.oneReplyAnswers)) missing.push("oneReplyAnswers (what one reply is for)");
+    if (!(t.landmarks.explicit || []).length) missing.push("landmarks.explicit");
+    if (!(t.landmarks.latent || []).length) missing.push("landmarks.latent");
+    return { t, missing, fields: 5 };
+  }
+
+  /**
+   * The whitelist. todos.js may describe a gate; it may never state one.
+   * A whitelist cannot be evaded by "fro"+"zen" or frozen — a blacklist can.
+   * Declared INSIDE the function on purpose: renderTrunk() runs at top level,
+   * so a module-scope `const` here would be in its temporal dead zone and the
+   * whole card would throw before painting a single gate.
+   */
+  function gateContamination(gates) {
+    const GATE_KEYS = ["id", "name", "decides", "options", "reading"];
+    const OPTION_KEYS = ["label"];
+    const bad = [];
+    (gates || []).forEach((g, i) => {
+      if (!g || typeof g !== "object") return;
+      Object.keys(g).forEach(k => {
+        if (GATE_KEYS.indexOf(k) < 0) bad.push('unexpected key "' + k + '" on gates[' + i + '] (' + (g.id || "?") + ")");
+      });
+      (g.options || []).forEach((o, j) => {
+        if (!o || typeof o !== "object") return;
+        Object.keys(o).forEach(k => {
+          if (OPTION_KEYS.indexOf(k) < 0) {
+            bad.push('unexpected key "' + k + '" on gates[' + i + '].options[' + j + "]");
+          }
+        });
+      });
+    });
+    return bad;
+  }
+
+  function str(x) { return x != null && String(x).trim() !== ""; }
+
+  function lmList(arr) {
+    return (arr || []).map(x => {
+      if (x && typeof x === "object") {
+        return { name: x.name || x.id || "?", plain: x.plain || x.layman || x.why || "" };
+      }
+      return { name: String(x), plain: "" };
+    });
+  }
+
+  function renderTrunk(meta) {
+    const host = document.getElementById("trunk");
+    const badge = document.getElementById("trunkBadge");
+    const { t, missing, fields } = normalizeTrunk(meta);
+    const filled = fields - missing.length;
+    const contaminated = gateContamination(t.gates.concat(t.bench));
+
+    // "complete" and "verified" are reserved for receipt-derived counts. This
+    // badge counts filled boxes and says so.
+    badge.textContent = "all fields filled " + filled + "/" + fields;
+    badge.className = "complete " + (missing.length === 0 ? "ok" : "bad");
+
+    let html = "";
+    if (contaminated.length) {
+      html +=
+        '<p class="miss">todos.js is narrating state: ' + esc(contaminated.join(" · ")) +
+        ". The whole tally is suppressed until that key is gone — readings live in todos.js, " +
+        "state lives in gatelaw.jsonl.</p>";
+    }
+    if (missing.length) {
+      html += '<p class="miss">Missing: ' + esc(missing.join(" · ")) + "</p>";
+    }
+
+    // Layman FIRST — always the largest surface
+    if (str(t.layman)) {
+      html += '<p class="layman">' + esc(t.layman) + "</p>";
+    } else {
+      html += '<p class="miss">No layman yet. Translate the trunk into plain English before trusting this plate.</p>';
+    }
+
+    html += gatesHtml(t, contaminated.length > 0);
+
+    html += '<div class="grid2">';
+    html +=
+      '<div class="blk reply"><h3>One short reply answers</h3>' +
+      (str(t.oneReplyAnswers)
+        ? '<p class="txt">' + esc(t.oneReplyAnswers) + "</p>"
+        : '<p class="miss">What is the one reply for?</p>') +
+      "</div>";
+    html += "</div>";
+
+    const exp = lmList(t.landmarks.explicit);
+    const lat = lmList(t.landmarks.latent);
+    html += '<div class="landmarks">';
+    html +=
+      '<div class="lm exp"><h3>Explicit landmarks</h3>' +
+      (exp.length
+        ? exp.map(lm =>
+            "<article><p class=\"nm\">" + esc(lm.name) + "</p>" +
+            (lm.plain ? "<p class=\"pl\">" + esc(lm.plain) + "</p>" : "") +
+            "</article>"
+          ).join("")
+        : '<p class="miss">Name the on-disk / numbered / already-written concepts.</p>') +
+      "</div>";
+    html +=
+      '<div class="lm lat"><h3>Latent landmarks</h3>' +
+      (lat.length
+        ? lat.map(lm =>
+            "<article><p class=\"nm\">" + esc(lm.name) + "</p>" +
+            (lm.plain ? "<p class=\"pl\">" + esc(lm.plain) + "</p>" : "") +
+            "</article>"
+          ).join("")
+        : '<p class="miss">Define jargon the trunk assumes (gate, receipt, bench…).</p>') +
+      "</div>";
+    html += "</div>";
+
+    if ((t.afterTrunk && t.afterTrunk.length) || str(t.afterPark)) {
+      html += '<p class="after">';
+      if (t.afterTrunk && t.afterTrunk.length) {
+        html += "<b>After the lines:</b> " + esc(t.afterTrunk.join(" · ")) + " ";
+      }
+      if (str(t.afterPark)) {
+        html += "<b>Parked:</b> " + esc(t.afterPark);
+      }
+      html += "</p>";
+    }
+
+    host.innerHTML = html;
+  }
+
+  /**
+   * The gate strip REFILLS. A receipt is an answer — the card says so plainly
+   * rather than hedging that it "only knows what it can show a receipt for".
+   * What it still refuses to do is invent one: an answer paints only when a
+   * receipt in gatelaw.jsonl resolves, never from a key in todos.js.
+   *
+   * Every paint: answered lines retire to a compact row, and the same number of
+   * bench questions step up to keep the strip full. Answer four, get four more —
+   * the strip is a working face, not a monument to the first four.
+   */
+  function liveRoster(t) {
+    const receipts = window.GATE_RECEIPTS || null; // Phase 1 fills this
+    const all = (t.gates || []).concat(t.bench || []);
+    const has = g => !!(receipts && g && g.id && receipts[g.id]);
+    const unanswered = all.filter(g => !has(g));
+    const width = (t.gates || []).length || 4; // how many lines the strip holds
+    return {
+      receipts,
+      answered: all.filter(has),
+      live: unanswered.slice(0, width),
+      waiting: unanswered.slice(width),
+      total: all.length,
+    };
+  }
+
+  function gatesHtml(t, suppressTally) {
+    const gates = t.gates || [];
+    if (!gates.length) {
+      return '<p class="miss">No gate roster on this trunk. Numbers alone (01 / 04 / 06 / 08) ' +
+        "are the part that gets left out — write the questions.</p>";
+    }
+
+    const r = liveRoster(t);
+
+    let tally;
+    if (suppressTally) {
+      tally = "tally suppressed — a state key is present in todos.js";
+    } else if (!r.receipts) {
+      tally =
+        "<b>" + r.live.length + " to answer</b> · 0 answered — no ledger on disk yet, " +
+        "so nothing here is claimed";
+    } else {
+      tally = "<b>" + r.live.length + " to answer</b> · " + r.answered.length +
+        " answered · " + r.waiting.length + " on the bench";
+    }
+
+    let h = '<div class="gates-h"><h3>The lines</h3><span class="tally">' + tally + "</span></div>";
+
+    // The one line to take next — recomputed from the strip, so it moves as
+    // receipts land instead of naming the same gate forever.
+    if (!suppressTally) h += nextLineHtml(r, t);
+
+    h += '<div class="gates">' +
+      r.answered.map(g => gateCard(g, r.receipts[g.id])).join("") +
+      r.live.map(g => gateCard(g, null)).join("") +
+      "</div>";
+
+    if (r.waiting.length) {
+      h += '<p class="waiting"><b>on the bench</b> — ' +
+        esc(r.waiting.map(g => (g.id || "?") + " " + (g.name || "")).join(" · ")) +
+        ". These step up as the lines above earn receipts.</p>";
+    }
+    return h;
+  }
+
+  function nextLineHtml(r, t) {
+    if (!r.live.length) {
+      const fork = (t.afterTrunk || []).join(" · ");
+      return '<p class="nextline"><b>next</b>' +
+        (fork ? esc(fork) : "Every line on this plate has a receipt. Write the next roster.") +
+        "</p>";
+    }
+    const g = r.live[0];
+    return '<p class="nextline"><b>next line to answer</b>' +
+      '<span class="gid">' + esc(g.id || "?") + "</span>" +
+      esc(g.decides || g.name || "") +
+      "</p>";
+  }
+
+  function gateCard(g, receipt) {
+    // A receipt resolved => answered. No receipt => it simply has not been
+    // answered here yet. There is deliberately no code path that reads a state
+    // field off `g` — the only source of "answered" is the argument above.
+    const opts = (g.options || []).map(o => {
+      const label = typeof o === "string" ? o : (o.label || "");
+      return '<span class="opt">' + esc(label) + "</span>";
+    }).join("");
+
+    const answered = !!receipt;
+    const quote = receipt && (receipt.quote || receipt.text || "");
+    const src = receipt && (receipt.source || receipt.path || receipt.at || "");
+
+    return '<div class="gate ' + (answered ? "law" : "open") + '">' +
+      '<div class="gh">' +
+        '<span class="gid">' + esc(g.id || "?") + "</span>" +
+        '<span class="gname">' + esc(g.name || "") + "</span>" +
+        '<span class="gstat">' + (answered ? "answered" : "not answered yet") + "</span>" +
+      "</div>" +
+      (answered
+        ? (quote ? '<p class="rq">“' + esc(quote) + '”</p>' : "") +
+          (src ? '<p class="rsrc">' + esc(src) + "</p>" : "")
+        : (str(g.decides) ? '<p class="gq">' + esc(g.decides) + "</p>" : "") +
+          (opts ? '<div class="opts">' + opts + "</div>" : "") +
+          (str(g.reading) ? '<p class="gnote"><b>reading</b> — ' + esc(g.reading) + "</p>" : "")) +
+      "</div>";
+  }
+
+  function listOrMiss(arr, miss) {
+    if (!arr || !arr.length) return '<p class="miss">' + esc(miss) + "</p>";
+    return "<ul>" + arr.map(x => "<li>" + esc(x) + "</li>").join("") + "</ul>";
+  }
+
+  function build(t) {
+    const el = document.createElement("div");
+    el.className = "row";
+    const isOpen = openSet.has(t.dir) || (t.hidden === false && !localStorage.getItem(KEY));
+    if (isOpen) { el.classList.add("open"); openSet.add(t.dir); }
+
+    el.innerHTML =
+      '<button class="head">' +
+        '<span class="chip p' + t.priority + '">' + t.priority + '</span>' +
+        '<span class="dir">' + esc(t.dir) + '</span>' +
+        '<span class="ttl">' + esc(t.title) + '</span>' +
+        '<span class="meta">' + (t.items || []).length + ' · ' + esc(t.origin || "") + '</span>' +
+      '</button>' +
+      '<div class="body">' +
+        '<ul class="items">' + (t.items || []).map(i => "<li class=\"item\">\t— " + esc(i) + "</li>").join("") + '</ul>' +
+        '<div class="move"><b>Move:</b> ' + esc(t.move || "") + '</div>' +
+      '</div>';
+
+    el.querySelector(".head").addEventListener("click", () => {
+      el.classList.toggle("open");
+      el.classList.contains("open") ? openSet.add(t.dir) : openSet.delete(t.dir);
+      save();
+    });
+    return { el, t };
+  }
+
+  const setAll = fn => { rows.forEach(({ el, t }) => fn(el, t)); save(); };
+  document.getElementById("expand").onclick = () =>
+    setAll((el, t) => { el.classList.add("open"); openSet.add(t.dir); });
+  document.getElementById("collapse").onclick = () =>
+    setAll((el, t) => { el.classList.remove("open"); openSet.delete(t.dir); });
+  document.getElementById("top3").onclick = () =>
+    setAll((el, t) => {
+      const on = t.priority === 5;
+      el.classList.toggle("open", on);
+      on ? openSet.add(t.dir) : openSet.delete(t.dir);
+    });
+  document.getElementById("face").onclick = () => document.body.classList.toggle("sans");
+
+  function esc(s) {
+    return String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  }
+</script>
+<script src="/cth-hover.js"></script>
+<script src="/suite-zip.js?v=9"></script>
